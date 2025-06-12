@@ -1,3 +1,9 @@
+<<<<<<< HEAD
 yt-dlp
 faster-whisper
 pyyaml
+=======
+yt-dlp
+faster-whisper
+pyyaml
+>>>>>>> 6a8326f (nigyatta_yattaを追加したよ)
