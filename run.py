@@ -184,8 +184,9 @@ def diarize_audio(wav_file: pathlib.Path):
         # 話者分離実行（会話用に最適化）
         diarization = pipeline(
             str(wav_file),
-            min_speakers=2,  # 最低2人の話者を想定
-            max_speakers=2,  # 2人の話者に固定
+            min_speakers=4,  # 4人の話者を強制
+            max_speakers=4,  # 4人の話者に固定
+            num_speakers=4,  # 話者数を明示的に指定
         )
         
         # 後処理: 短いセグメントの統合
@@ -202,51 +203,54 @@ def diarize_audio(wav_file: pathlib.Path):
 def smooth_diarization(diarization, min_duration: float = None, merge_gap: float = None):
     """話者分離結果の後処理（短いセグメント統合・ギャップ埋め）"""
     if min_duration is None:
-        min_duration = 0.2  # より短いセグメントを許容
+        min_duration = 0.1  # より短いセグメントを許容
     if merge_gap is None:
-        merge_gap = 0.3  # より短いギャップを許容
+        merge_gap = 0.2  # より短いギャップを許容
     
     # 短いセグメントを前後の長いセグメントに統合
     segments = []
     for segment, track, label in diarization.itertracks(yield_label=True):
         segments.append((segment, track, label))
     
+    # 話者ごとのセグメントをグループ化
+    speaker_segments = {}
+    for segment, track, label in segments:
+        if label not in speaker_segments:
+            speaker_segments[label] = []
+        speaker_segments[label].append((segment, track))
+    
+    # 各話者のセグメントを時間順にソート
+    for label in speaker_segments:
+        speaker_segments[label].sort(key=lambda x: x[0].start)
+    
+    # セグメントの統合
     filtered_segments = []
-    
-    for i, (segment, track, label) in enumerate(segments):
-        duration = segment.end - segment.start
+    for label, segs in speaker_segments.items():
+        current_seg = None
+        current_track = None
         
-        # 短いセグメントの処理
-        if duration < min_duration and len(segments) > 1:
-            # 前後のセグメントを確認
-            prev_seg = segments[i-1] if i > 0 else None
-            next_seg = segments[i+1] if i < len(segments) - 1 else None
-            
-            # 前のセグメントとの間隔
-            prev_gap = segment.start - prev_seg[0].end if prev_seg else float('inf')
-            # 次のセグメントとの間隔
-            next_gap = next_seg[0].start - segment.end if next_seg else float('inf')
-            
-            # より近いセグメントに統合
-            if prev_gap <= next_gap and prev_gap <= merge_gap:
-                if len(filtered_segments) > 0:
-                    last_seg, last_track, last_label = filtered_segments[-1]
-                    if last_label == prev_seg[2]:
-                        # セグメントを結合（新しいセグメントを作成）
-                        from pyannote.core import Segment
-                        merged_segment = Segment(
-                            start=min(last_seg.start, segment.start),
-                            end=max(last_seg.end, segment.end)
-                        )
-                        filtered_segments[-1] = (merged_segment, last_track, last_label)
-                        continue
-            elif next_gap <= merge_gap:
-                if next_seg:
-                    filtered_segments.append((segment, track, next_seg[2]))
-                    continue
+        for segment, track in segs:
+            if current_seg is None:
+                current_seg = segment
+                current_track = track
+            else:
+                # ギャップが閾値以下の場合のみ統合
+                if segment.start - current_seg.end <= merge_gap:
+                    from pyannote.core import Segment
+                    current_seg = Segment(
+                        start=current_seg.start,
+                        end=segment.end
+                    )
+                else:
+                    filtered_segments.append((current_seg, current_track, label))
+                    current_seg = segment
+                    current_track = track
         
-        filtered_segments.append((segment, track, label))
+        if current_seg is not None:
+            filtered_segments.append((current_seg, current_track, label))
     
+    # 時間順にソート
+    filtered_segments.sort(key=lambda x: x[0].start)
     return filtered_segments
 
 # ─── 5. ASR + Diarization 統合 ─────────────────
@@ -289,7 +293,19 @@ def assign_speakers_to_words(asr_result: Dict[str, Any], diarization) -> Dict[st
                 speaker = max(overlapping_speakers, key=lambda x: x[1])[0]
                 segment["speaker"] = speaker_map[speaker]
             else:
-                segment["speaker"] = "SPEAKER_UNKNOWN"
+                # 最も近い話者を探す
+                closest_speaker = None
+                min_distance = float('inf')
+                for spk_seg, _, label in segments:
+                    distance = min(abs(spk_seg.end - start_time), abs(spk_seg.start - end_time))
+                    if distance < min_distance:
+                        min_distance = distance
+                        closest_speaker = label
+                
+                if closest_speaker and min_distance < 0.5:  # 0.5秒以内の距離
+                    segment["speaker"] = speaker_map[closest_speaker]
+                else:
+                    segment["speaker"] = "SPEAKER_UNKNOWN"
         
         print("✓ 話者-単語 割り当て完了")
         return asr_result
