@@ -1,1 +1,17 @@
+# ✅ 仮想環境はGitに含めない
+.venv/
+
+# ✅ Pythonのキャッシュファイルも不要
+__pycache__/
+
+# ✅ 重いファイルはGit管理に不向き
+*.wav
+*.mp4
+*.exe
+
+# ✅ VSCodeやPyCharmなどIDEの個人設定ファイルも除外
+.vscode/
+.idea/
+
+# ✅ あなたの環境依存の設定ファイルも除外
 config.yaml
