@@ -6,3 +6,5 @@ pydub
 resemblyzer
 scikit-learn
 pyyaml
+openai
+python-dotenv

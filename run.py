@@ -6,6 +6,10 @@ run_resemble.py — YouTube Shorts → 高精度音声認識＋Resemblyzer話者
 from __future__ import annotations
 import sys, os, re, pathlib, tempfile, datetime, warnings, yaml
 from typing import Optional, Tuple, Dict, Any
+from dotenv import load_dotenv
+
+# 環境変数を読み込み
+load_dotenv()
 import numpy as np
 import torch
 import whisperx
@@ -38,6 +42,11 @@ OUTPUT_DIR = VAULT_PATH / "00_YouTube_Shorts_Transcripts"
 
 # 出力ディレクトリが存在しない場合は作成
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Hugging Faceトークンの設定（必要に応じて）
+hf_token = os.getenv("HF_TOKEN")
+if hf_token:
+    os.environ["HF_TOKEN"] = hf_token
 
 # --- YouTube 音声取得 ---
 def download_audio(url: str, out_dir: pathlib.Path) -> Tuple[pathlib.Path, Dict[str, Any]]:
