@@ -81,7 +81,7 @@ python run.py
 python video_note_generator.py
 ```
 
-最新の文字起こしファイルを自動で読み込み、GPT-4を使用して詳細な学習ノートを生成します。出力先：
+最新の文字起こしファイルを自動で読み込み、GPT-4.1を使用して詳細な学習ノートを生成します。出力先：
 ```
 [VaultPath]/10_VIDEOS/[生成されたslug].md
 ```
