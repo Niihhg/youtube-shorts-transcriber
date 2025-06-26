@@ -181,7 +181,7 @@ source: "https://youtube.com/shorts/xxxxx"
 ---
 
 ## 👤 作者
-Nicco  
+Niccco  
 (日本語／英語／フランス語対応)
 
 
